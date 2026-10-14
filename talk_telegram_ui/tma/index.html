@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Hermes voice</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { background: #101218; color: #f4f5f7; margin: 0; min-height: 100vh; }
+      main { display: grid; min-height: 100vh; place-items: center; padding: 24px; box-sizing: border-box; }
+      section { width: min(34rem, 100%); text-align: center; }
+      h1 { font-size: 2rem; margin: 0 0 8px; }
+      p { color: #aeb4c0; min-height: 1.5em; }
+      button { background: #4d8dff; border: 0; border-radius: 999px; color: white; font-size: 1rem; padding: 14px 24px; }
+      button[disabled] { opacity: .5; }
+      #end { background: #424752; margin-left: 8px; }
+      #status { margin-top: 20px; font-size: .9rem; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Hermes voice</h1>
+        <p id="hint">Tap Start and allow microphone access.</p>
+        <button id="start" type="button">Start</button>
+        <button id="end" type="button" disabled>End</button>
+        <p id="status" role="status"></p>
+      </section>
+    </main>
+    <script src="/tma/app.js"></script>
+  </body>
+</html>

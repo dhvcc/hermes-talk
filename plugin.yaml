@@ -11,4 +11,5 @@ provides_hooks:
   - subagent_start
   - subagent_stop
   - post_tool_call
+  - post_llm_call
   - pre_approval_request

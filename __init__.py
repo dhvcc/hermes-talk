@@ -31,6 +31,7 @@ try:
         talk_lifecycle,
         talk_progress,
         talk_providers,
+        talk_telegram_tma,
         talk_tools,
         talk_transcript,
     )
@@ -45,6 +46,7 @@ except ImportError:  # pragma: no cover - flat-module fallback (pip -e install)
     import talk_lifecycle
     import talk_progress
     import talk_providers
+    import talk_telegram_tma
     import talk_tools
     import talk_transcript
 
@@ -395,6 +397,16 @@ def register(ctx) -> None:
         _unsupported("realtime voice provider", "realtime_voice_provider")
 
     _register_core_realtime_providers(ctx)
+
+    if callable(getattr(ctx, "register_platform", None)):
+        try:
+            talk_telegram_tma.register(ctx)
+        except Exception as exc:  # noqa: BLE001 - isolate optional TMA registration
+            _record("Telegram Mini App", "telegram_tma", exc)
+        else:
+            _registered("telegram_tma")
+    else:
+        _unsupported("Telegram Mini App", "telegram_tma")
 
     register_worker = getattr(ctx, "register_task_worker_provider", None)
     if callable(register_worker):

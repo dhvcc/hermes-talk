@@ -1483,6 +1483,10 @@ async def run_talk_session(
     native_task_api=None,
     control_input=None,
     on_native_controller=None,
+    tool_executor=None,
+    tools_override: list[dict] | None = None,
+    announce_queue: asyncio.Queue | None = None,
+    error_sink=None,
 ) -> int:
     """Run one voice session. Returns a process exit code.
 
@@ -1587,7 +1591,11 @@ async def run_talk_session(
         tools = (
             host_execution_attachment.tool_definitions()
             if host_execution_attachment is not None
-            else talk_tools.default_talk_tools(pausable=resume_control is not None)
+            else (
+                list(tools_override)
+                if tools_override is not None
+                else talk_tools.default_talk_tools(pausable=resume_control is not None)
+            )
         )
     except Exception as exc:  # noqa: BLE001 - host attachment startup boundary
         print(f"talk: host tool setup failed: {type(exc).__name__}", file=sys.stderr)
@@ -1716,7 +1724,11 @@ async def run_talk_session(
     def on_caption(text: str) -> None:
         print(text, end="", flush=True)
 
-    def on_error(text: str) -> None:
+    def emit_error(text: str) -> None:
+        if error_sink is not None:
+            with suppress(Exception):
+                error_sink(text)
+            return
         print(f"\n[talk] {text}", file=sys.stderr, flush=True)
 
     capture = talk_transcript.TranscriptCapture(hermes_home)
@@ -1725,7 +1737,8 @@ async def run_talk_session(
         on_caption=on_caption,
         on_transcript_turn=capture.append_turn,
         on_barge_in=on_barge_in,
-        on_error=on_error,
+        on_error=emit_error,
+        tool_executor=tool_executor,
         tool_authorizer=(
             authorization_ledger.authorize_tool
             if authorization_ledger is not None
@@ -1747,7 +1760,7 @@ async def run_talk_session(
             voice_id=cascade_config[1],
             model=cascade_config[2],
             on_audio=audio.queue_playback,
-            on_error=on_error,
+            on_error=emit_error,
             voice_settings=talk_config.elevenlabs_voice_settings(),
         )
     session = None
@@ -2052,7 +2065,8 @@ async def run_talk_session(
                 if isinstance(event, talk_realtime.ResponseFinished):
                     print(flush=True)
 
-        announce_queue: asyncio.Queue = asyncio.Queue()
+        if announce_queue is None:
+            announce_queue = asyncio.Queue()
 
         def on_subagent_event(event: dict) -> None:
             """Queue a child's terminal (or progress) announcement on the loop.
@@ -2208,7 +2222,7 @@ async def run_talk_session(
                     or bool(tool_coordinator.outputs)
                     or speaker_busy()
                 ),
-                lambda waited: on_error(
+                lambda waited: emit_error(
                     f"an update has been waiting {waited:.0f}s for a safe opening"
                 ),
             )

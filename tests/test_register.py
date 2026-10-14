@@ -332,7 +332,7 @@ def test_absent_optional_methods_warn_without_registration_failure(plugin, monke
     check = plugin.talk_cli.talk_doctor._plugin_check()
     assert check["status"] == "warn"
     assert check["details"]["required_issue_count"] == 0
-    assert check["details"]["optional_issue_count"] == 9
+    assert check["details"]["optional_issue_count"] == 10
 
 
 def test_absent_required_method_is_a_required_failure_not_an_exception(plugin, monkeypatch):
