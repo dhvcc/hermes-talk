@@ -89,7 +89,7 @@ def test_audio_queue_is_bounded_and_drain_invalidates_pending_audio():
     asyncio.run(check())
 
 
-def test_tma_announcement_isolated_provider_command():
+def test_tma_announcement_uses_temporary_input():
     async def check():
         connection = tma.TmaConnection(
             tma.TmaRuntime(),
@@ -98,18 +98,88 @@ def test_tma_announcement_isolated_provider_command():
         )
         connection._queue_announcement_now("Telegram Hermes result", "3973")
         commands = connection.announce_queue.get_nowait()
-        assert len(commands) == 1
-        command = commands[0]
-        assert isinstance(command, tma.talk_realtime.StartResponse)
-        assert command.allow_tools is False
-        assert command.input == ()
-        assert command.conversation == "none"
-        assert "3973" in command.instructions
-        assert "UNTRUSTED DATA" in command.instructions
+        assert len(commands) == 2
+        item, start = commands
+        assert isinstance(item, tma.talk_realtime.AddInputText)
+        assert item.item_id.startswith(tma.TMA_ANNOUNCEMENT_ITEM_PREFIX)
+        assert "3973" in item.text
+        assert "UNTRUSTED DATA" in item.text
+        assert isinstance(start, tma.talk_realtime.StartResponse)
+        assert start.allow_tools is False
+        assert start.input is None
+        assert start.conversation is None
         assert not any(
-            isinstance(item, (tma.talk_realtime.AddContext, tma.talk_realtime.RemoveContext))
-            for item in commands
+            isinstance(command, (tma.talk_realtime.AddContext, tma.talk_realtime.RemoveContext))
+            for command in commands
         )
+
+    asyncio.run(check())
+
+
+def test_tma_session_retires_announcement_after_response():
+    async def check():
+        class FakeSession:
+            def __init__(self):
+                self.state = tma.talk_realtime.SessionState.NEW
+                self.events = asyncio.Queue()
+                self.sent = []
+                self.connected = None
+                self.closed = False
+
+            async def connect(self, setup):
+                self.connected = setup
+                self.state = tma.talk_realtime.SessionState.CONNECTED
+
+            async def send(self, commands):
+                self.sent.append(tuple(commands))
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                return await self.events.get()
+
+            async def close(self):
+                self.closed = True
+                self.state = tma.talk_realtime.SessionState.CLOSED
+
+        base = FakeSession()
+        session = tma._TmaRealtimeSession(base)
+        setup = object()
+        await session.connect(setup)
+        assert base.connected is setup
+
+        await session.send(
+            [
+                tma.talk_realtime.AddInputText("prior-item", "prior response"),
+                tma.talk_realtime.StartResponse(allow_tools=False),
+            ]
+        )
+        events = session.__aiter__()
+        prior_finished = tma.talk_realtime.ResponseFinished(response_id="prior")
+        await base.events.put(prior_finished)
+        assert await events.__anext__() == prior_finished
+        assert len(base.sent) == 1
+
+        commands = tma._tma_announcement_commands("Result", "3973")
+        item = commands[0]
+        await session.send(commands)
+        assert len(base.sent) == 2
+        assert not any(
+            isinstance(command, tma.talk_realtime.RemoveContext)
+            for command in base.sent[-1]
+        )
+
+        finished = tma.talk_realtime.ResponseFinished(response_id="announcement")
+        await base.events.put(finished)
+        assert await events.__anext__() == finished
+        assert len(base.sent) == 3
+        assert base.sent[-1] == (
+            tma.talk_realtime.RemoveContext(item_id=item.item_id),
+        )
+
+        await session.close()
+        assert base.closed
 
     asyncio.run(check())
 
