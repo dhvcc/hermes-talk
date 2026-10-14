@@ -755,6 +755,10 @@ class _TelegramTmaAdapterMethods:
         del is_reconnect
         if self._runner is not None:
             return True
+        if self.runtime.ctx is not None and _context_is_multiplexed(self.runtime.ctx):
+            message = "Telegram Mini App is unavailable on a multiplexed Hermes gateway"
+            self._set_fatal_error("configuration", message, retryable=False)
+            return False
         if not _tma_validate_config(self.config):
             message = (
                 "Telegram Mini App needs an enabled listener, bot token, "
@@ -1025,8 +1029,6 @@ def register(ctx) -> None:
         raise TmaUnavailable(
             f"Telegram Mini App is only supported by the default Hermes profile (got {profile!r})"
         )
-    if _context_is_multiplexed(ctx):
-        raise TmaUnavailable("Telegram Mini App is unavailable on a multiplexed Hermes gateway")
     runtime = TmaRuntime(ctx, profile=profile)
     register_platform(
         name=TMA_PLATFORM,

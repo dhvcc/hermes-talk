@@ -252,7 +252,7 @@ def test_register_platform_and_final_hook():
     assert registered["hook"][0] == "post_llm_call"
 
 
-def test_register_rejects_named_and_multiplexed_profiles():
+def test_register_rejects_named_profile_and_defers_multiplex_check(monkeypatch):
     class NamedContext:
         profile_name = "ops"
 
@@ -262,15 +262,41 @@ def test_register_rejects_named_and_multiplexed_profiles():
     with pytest.raises(tma.TmaUnavailable, match="default Hermes profile"):
         tma.register(NamedContext())
 
+    calls = []
+
     class MultiplexedContext:
         profile_name = "default"
         gateway_config = types.SimpleNamespace(multiplex_profiles=True)
 
         def register_platform(self, **kwargs):
-            del kwargs
+            calls.append(kwargs)
 
-    with pytest.raises(tma.TmaUnavailable, match="multiplexed"):
-        tma.register(MultiplexedContext())
+        def register_hook(self, name, callback):
+            del name, callback
+
+    monkeypatch.setattr(
+        tma, "_context_is_multiplexed", lambda context: pytest.fail("checked during register")
+    )
+    tma.register(MultiplexedContext())
+    assert calls
+
+
+def test_adapter_rejects_multiplexed_gateway_after_registration(monkeypatch):
+    async def check():
+        adapter = object.__new__(tma._TelegramTmaAdapterMethods)
+        adapter.config = types.SimpleNamespace(enabled=True, token="123:secret")
+        adapter.runtime = tma.TmaRuntime(object())
+        adapter._runner = adapter._site = adapter._connection = adapter._server_app = None
+        fatal = []
+        adapter._set_fatal_error = lambda *args, **kwargs: fatal.append((args, kwargs))
+        monkeypatch.setattr(tma, "_context_is_multiplexed", lambda context: True)
+
+        assert await adapter.connect() is False
+        assert fatal[0][0][1] == (
+            "Telegram Mini App is unavailable on a multiplexed Hermes gateway"
+        )
+
+    asyncio.run(check())
 
 
 def test_websocket_auth_and_single_call_lifecycle(monkeypatch):
