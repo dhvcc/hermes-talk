@@ -89,6 +89,31 @@ def test_audio_queue_is_bounded_and_drain_invalidates_pending_audio():
     asyncio.run(check())
 
 
+def test_tma_announcement_isolated_provider_command():
+    async def check():
+        connection = tma.TmaConnection(
+            tma.TmaRuntime(),
+            types.SimpleNamespace(send_json=lambda _payload: None),
+            tma.TmaIdentity(42, "owner", None, None, 1_000, "42"),
+        )
+        connection._queue_announcement_now("Telegram Hermes result", "3973")
+        commands = connection.announce_queue.get_nowait()
+        assert len(commands) == 1
+        command = commands[0]
+        assert isinstance(command, tma.talk_realtime.StartResponse)
+        assert command.allow_tools is False
+        assert command.input == ()
+        assert command.conversation == "none"
+        assert "3973" in command.instructions
+        assert "UNTRUSTED DATA" in command.instructions
+        assert not any(
+            isinstance(item, (tma.talk_realtime.AddContext, tma.talk_realtime.RemoveContext))
+            for item in commands
+        )
+
+    asyncio.run(check())
+
+
 def test_gateway_admission_requires_exact_final_turn():
     async def check():
         calls = []
