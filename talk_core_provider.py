@@ -563,7 +563,7 @@ if _CORE_IMPORT_ERROR is None:
                 self.default_voice()
                 model = self.default_model()
                 auth = talk_auth.auth_diagnostic()
-            except Exception:  # readiness never raises
+            except Exception:  # readiness never raises  # noqa: BLE001
                 logger.debug("hermes-talk/openai readiness probe failed", exc_info=True)
                 return False
             return bool(model and auth.get("configured"))
@@ -625,7 +625,7 @@ if _CORE_IMPORT_ERROR is None:
                 self.default_voice()
                 model = self.default_model()
                 diagnostic = talk_grok_auth.grok_auth_diagnostic()
-            except Exception:  # readiness never raises
+            except Exception:  # readiness never raises  # noqa: BLE001
                 logger.debug("hermes-talk/grok readiness probe failed", exc_info=True)
                 return False
             return bool(model and diagnostic.get("configured"))
@@ -698,7 +698,7 @@ if _CORE_IMPORT_ERROR is None:
                 self.default_voice()
                 model = self.default_model()
                 configured = bool(talk_config.resolve_gemini_key())
-            except Exception:  # readiness never raises
+            except Exception:  # readiness never raises  # noqa: BLE001
                 logger.debug("hermes-talk/gemini readiness probe failed", exc_info=True)
                 return False
             return bool(model and configured)

@@ -213,7 +213,9 @@ not a build artifact), `dashboard/manifest.json`.
 - **Ruff decides.** `E F I UP B SIM RUF BLE`, line length 100, target
   `py311` — all in `pyproject.toml`. Run the pinned version; the rule set
   and the version are pinned separately, and each pin alone still lets a
-  ruff release turn the build red. Bump both together, in their own PR.
+  ruff release turn the build red. The dev pin also matches Hermes core's
+  shared workspace pin; changing it independently makes plugin activation's
+  dependency lock unsatisfiable. Bump both together, in their own PR.
 - **Knobs resolve at call time.** Every `TALK_*` setting is read when it
   is needed, in `talk_config.py`, never bound at import or cached in a
   module global. Tests rely on flipping the environment between calls.
@@ -229,13 +231,9 @@ not a build artifact), `dashboard/manifest.json`.
   contracts, and a wrong sentence is a real bug.
 - **Broad `except` clauses are house style at the voice boundary** — a live
   call must not die on a stack trace — and each one states its reason in
-  a comment. Don't "fix" them; do justify new ones. Whether the reason
-  also needs a `noqa: BLE001` depends on the pinned ruff and, surprisingly,
-  on what the module calls its logger: since 0.16 ruff drops BLE001 when
-  the handler logs the exception through a name it treats as a logger
-  (`logger` yes, `_log` no), and a directive it no longer needs fails
-  `RUF100`. Let `ruff check .` decide rather than copying a neighbouring
-  handler.
+  a comment. Don't "fix" them; do justify new ones. The pinned Ruff 0.15
+  reports BLE001 for the three readiness handlers, so they keep explicit
+  `noqa: BLE001` markers.
 - **Cross-platform, always.** Open files with `encoding="utf-8"`; build
   paths with `pathlib`; guard POSIX-only process calls behind
   `sys.platform`; treat an audio device as optional (the `[audio]` extra
